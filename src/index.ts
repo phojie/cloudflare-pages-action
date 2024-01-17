@@ -68,7 +68,7 @@ try {
 			repo: context.repo.repo,
 			issue_number: context.issue.number
 		})
-		console.dir(comments.data)
+		// console.dir(comments.data)
 		const deploymentComment = comments.data.find(c => !!c.performed_via_github_app?.id && c.body?.includes("Deploying with Cloudflare Pages"))
 		if (deploymentComment) {
 			// update comment
@@ -94,14 +94,14 @@ try {
 		const deployment = await octokit.rest.repos.createDeployment({
 			owner: context.repo.owner,
 			repo: context.repo.repo,
-			ref: `refs/pull/${context.issue.number}/merge` || context.sha,
+			ref: branch || context.sha,
 			auto_merge: false,
 			description: "Cloudflare Pages",
 			required_contexts: [],
 			environment,
 			production_environment: productionEnvironment,
 		});
-		console.log(deployment.data)
+		// console.dir(deployment.data)
 
 		if (deployment.status === 201) {
 			return deployment.data;
@@ -175,6 +175,7 @@ try {
 		}
 
 		const pagesDeployment = await createPagesDeployment();
+		console.dir(pagesDeployment)
 		setOutput("id", pagesDeployment.id);
 		setOutput("url", pagesDeployment.url);
 		setOutput("environment", pagesDeployment.environment);
@@ -197,7 +198,7 @@ try {
 				productionEnvironment,
 				octokit,
 			});
-			console.dir(deploymentStatus.data)
+			// console.dir(deploymentStatus.data)
 		}
 	})();
 } catch (thrown) {

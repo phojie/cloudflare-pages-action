@@ -23613,7 +23613,6 @@ try {
       repo: import_github.context.repo.repo,
       issue_number: import_github.context.issue.number
     });
-    console.dir(comments.data);
     const deploymentComment = comments.data.find((c) => !!c.performed_via_github_app?.id && c.body?.includes("Deploying with Cloudflare Pages"));
     if (deploymentComment) {
       return octokit.rest.issues.updateComment({
@@ -23636,14 +23635,13 @@ try {
     const deployment = await octokit.rest.repos.createDeployment({
       owner: import_github.context.repo.owner,
       repo: import_github.context.repo.repo,
-      ref: `refs/pull/${import_github.context.issue.number}/merge` || import_github.context.sha,
+      ref: branch || import_github.context.sha,
       auto_merge: false,
       description: "Cloudflare Pages",
       required_contexts: [],
       environment,
       production_environment: productionEnvironment
     });
-    console.log(deployment.data);
     if (deployment.status === 201) {
       return deployment.data;
     }
@@ -23698,6 +23696,7 @@ try {
       gitHubDeployment = await createGitHubDeployment(octokit, productionEnvironment, environmentName);
     }
     const pagesDeployment = await createPagesDeployment();
+    console.dir(pagesDeployment);
     (0, import_core.setOutput)("id", pagesDeployment.id);
     (0, import_core.setOutput)("url", pagesDeployment.url);
     (0, import_core.setOutput)("environment", pagesDeployment.environment);
@@ -23717,7 +23716,6 @@ try {
         productionEnvironment,
         octokit
       });
-      console.dir(deploymentStatus.data);
     }
   })();
 } catch (thrown) {
