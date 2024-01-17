@@ -23571,6 +23571,7 @@ try {
   const branch = (0, import_core.getInput)("branch", { required: false });
   const workingDirectory = (0, import_core.getInput)("workingDirectory", { required: false });
   const wranglerVersion = (0, import_core.getInput)("wranglerVersion", { required: false });
+  const debug = (0, import_core.getInput)("debug", { required: false });
   const getProject = async () => {
     const response = await (0, import_undici.fetch)(
       `https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects/${projectName}`,
@@ -23615,6 +23616,8 @@ try {
       repo: import_github.context.repo.repo,
       issue_number: import_github.context.issue.number
     });
+    if (debug)
+      console.dir("comments.data", comments.data);
     const deploymentComment = comments.data.find((c) => !!c.performed_via_github_app?.id && c.body?.includes("Deploying with Cloudflare Pages"));
     if (deploymentComment) {
       return octokit.rest.issues.updateComment({
@@ -23644,6 +23647,8 @@ try {
       environment,
       production_environment: productionEnvironment
     });
+    if (debug)
+      console.dir("deployment.data", deployment.data);
     if (deployment.status === 201) {
       return deployment.data;
     }
@@ -23698,6 +23703,8 @@ try {
       gitHubDeployment = await createGitHubDeployment(octokit, productionEnvironment, environmentName);
     }
     const pagesDeployment = await createPagesDeployment();
+    if (debug)
+      console.dir("pagesDeployment", pagesDeployment);
     (0, import_core.setOutput)("id", pagesDeployment.id);
     (0, import_core.setOutput)("url", pagesDeployment.url);
     (0, import_core.setOutput)("environment", pagesDeployment.environment);
@@ -23717,6 +23724,8 @@ try {
         productionEnvironment,
         octokit
       });
+      if (debug)
+        console.dir("deploymentStatus.data", deploymentStatus.data);
     }
   })();
 } catch (thrown) {
