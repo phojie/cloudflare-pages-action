@@ -62,6 +62,34 @@ try {
 
 	const githubBranch = env.GITHUB_HEAD_REF || env.GITHUB_REF_NAME;
 
+	const createDeploymentComment = async (octokit: Octokit, body: string) => {
+		const comments = await octokit.rest.issues.listComments({
+			owner: context.repo.owner,
+			repo: context.repo.repo,
+			issue_number: context.issue.number
+		})
+		console.dir(comments)
+		const deploymentComment = comments.data.find(c => !!c.performed_via_github_app?.id && c.body_text?.includes("Deploying with Cloudflare Pages"))
+		if (deploymentComment) {
+			// update comment
+			return octokit.rest.issues.updateComment({
+				owner: context.repo.owner,
+				repo: context.repo.repo,
+				issue_number: context.issue.number,
+				comment_id: deploymentComment.id,
+				body,
+			})
+		} else {
+			// create comment
+			return octokit.rest.issues.createComment({
+				owner: context.repo.owner,
+				repo: context.repo.repo,
+				issue_number: context.issue.number,
+				body
+			})
+		}
+	}
+
 	const createGitHubDeployment = async (octokit: Octokit, productionEnvironment: boolean, environment: string) => {
 		const deployment = await octokit.rest.repos.createDeployment({
 			owner: context.repo.owner,
@@ -73,6 +101,7 @@ try {
 			environment,
 			production_environment: productionEnvironment,
 		});
+		console.dir(deployment)
 
 		if (deployment.status === 201) {
 			return deployment.data;
@@ -119,23 +148,23 @@ try {
 			status = "🚫  Deployment failed";
 		}
 
-		await summary
-			.addRaw(
-				`
-# Deploying with Cloudflare Pages
+		const summaryBody = `
+		# Deploying with Cloudflare Pages
+		
+		| Name                    | Result |
+		| ----------------------- | - |
+		| **Last commit:**        | \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\` |
+		| **Status**:             | ${status} |
+		| **Preview URL**:        | ${deployment.url} |
+		| **Branch Preview URL**: | ${aliasUrl} |
+					`
 
-| Name                    | Result |
-| ----------------------- | - |
-| **Last commit:**        | \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\` |
-| **Status**:             | ${status} |
-| **Preview URL**:        | ${deployment.url} |
-| **Branch Preview URL**: | ${aliasUrl} |
-      `
-			)
-			.write();
+		await summary.addRaw(summaryBody).write();
+		return summaryBody
 	};
 
 	(async () => {
+		const octokit = getOctokit(gitHubToken);
 		const project = await getProject();
 
 		const productionEnvironment = githubBranch === project.production_branch || branch === project.production_branch;
@@ -144,7 +173,6 @@ try {
 		let gitHubDeployment: Awaited<ReturnType<typeof createGitHubDeployment>>;
 
 		if (gitHubToken && gitHubToken.length) {
-			const octokit = getOctokit(gitHubToken);
 			gitHubDeployment = await createGitHubDeployment(octokit, productionEnvironment, environmentName);
 		}
 
@@ -159,10 +187,9 @@ try {
 		}
 		setOutput("alias", alias);
 
-		await createJobSummary({ deployment: pagesDeployment, aliasUrl: alias });
-
+		const summary = await createJobSummary({ deployment: pagesDeployment, aliasUrl: alias });
+		await createDeploymentComment(octokit, summary)
 		if (gitHubDeployment) {
-			const octokit = getOctokit(gitHubToken);
 
 			await createGitHubDeploymentStatus({
 				id: gitHubDeployment.id,
