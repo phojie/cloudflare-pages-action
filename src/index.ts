@@ -69,7 +69,7 @@ try {
 			issue_number: context.issue.number
 		})
 		console.dir(comments)
-		const deploymentComment = comments.data.find(c => !!c.performed_via_github_app?.id && c.body_text?.includes("Deploying with Cloudflare Pages"))
+		const deploymentComment = comments.data.find(c => !!c.performed_via_github_app?.id && c.body?.includes("Deploying with Cloudflare Pages"))
 		if (deploymentComment) {
 			// update comment
 			return octokit.rest.issues.updateComment({
@@ -101,7 +101,6 @@ try {
 			environment,
 			production_environment: productionEnvironment,
 		});
-		console.dir(deployment)
 
 		if (deployment.status === 201) {
 			return deployment.data;
@@ -123,7 +122,7 @@ try {
 		environmentName: string;
 		productionEnvironment: boolean;
 	}) => {
-		await octokit.rest.repos.createDeploymentStatus({
+		return octokit.rest.repos.createDeploymentStatus({
 			owner: context.repo.owner,
 			repo: context.repo.repo,
 			deployment_id: id,
@@ -148,16 +147,14 @@ try {
 			status = "🚫  Deployment failed";
 		}
 
-		const summaryBody = `
-		# Deploying with Cloudflare Pages
-		
-		| Name                    | Result |
-		| ----------------------- | - |
-		| **Last commit:**        | \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\` |
-		| **Status**:             | ${status} |
-		| **Preview URL**:        | ${deployment.url} |
-		| **Branch Preview URL**: | ${aliasUrl} |
-					`
+		const summaryBody = `# Deploying with Cloudflare Pages
+
+| Name                    | Result |
+| ----------------------- | - |
+| **Last commit:**        | \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\` |
+| **Status**:             | ${status} |
+| **Preview URL**:        | ${deployment.url} |
+| **Branch Preview URL**: | ${aliasUrl} |`
 
 		await summary.addRaw(summaryBody).write();
 		return summaryBody
@@ -189,9 +186,9 @@ try {
 
 		const summary = await createJobSummary({ deployment: pagesDeployment, aliasUrl: alias });
 		await createDeploymentComment(octokit, summary)
-		if (gitHubDeployment) {
 
-			await createGitHubDeploymentStatus({
+		if (gitHubDeployment) {
+			const deploymentStatus = await createGitHubDeploymentStatus({
 				id: gitHubDeployment.id,
 				url: pagesDeployment.url,
 				deploymentId: pagesDeployment.id,
@@ -199,6 +196,7 @@ try {
 				productionEnvironment,
 				octokit,
 			});
+			console.dir(deploymentStatus)
 		}
 	})();
 } catch (thrown) {
