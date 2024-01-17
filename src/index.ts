@@ -63,6 +63,8 @@ try {
 	const githubBranch = env.GITHUB_HEAD_REF || env.GITHUB_REF_NAME;
 
 	const createDeploymentComment = async (octokit: Octokit, body: string) => {
+		if (!context.issue.number) return
+
 		const comments = await octokit.rest.issues.listComments({
 			owner: context.repo.owner,
 			repo: context.repo.repo,
@@ -175,7 +177,7 @@ try {
 		}
 
 		const pagesDeployment = await createPagesDeployment();
-		console.dir(pagesDeployment)
+		// console.dir(pagesDeployment)
 		setOutput("id", pagesDeployment.id);
 		setOutput("url", pagesDeployment.url);
 		setOutput("environment", pagesDeployment.environment);

@@ -23608,6 +23608,8 @@ try {
   };
   const githubBranch = import_process.env.GITHUB_HEAD_REF || import_process.env.GITHUB_REF_NAME;
   const createDeploymentComment = async (octokit, body) => {
+    if (!import_github.context.issue.number)
+      return;
     const comments = await octokit.rest.issues.listComments({
       owner: import_github.context.repo.owner,
       repo: import_github.context.repo.repo,
@@ -23696,7 +23698,6 @@ try {
       gitHubDeployment = await createGitHubDeployment(octokit, productionEnvironment, environmentName);
     }
     const pagesDeployment = await createPagesDeployment();
-    console.dir(pagesDeployment);
     (0, import_core.setOutput)("id", pagesDeployment.id);
     (0, import_core.setOutput)("url", pagesDeployment.url);
     (0, import_core.setOutput)("environment", pagesDeployment.environment);
