@@ -46,7 +46,7 @@ try {
       $ export CLOUDFLARE_ACCOUNT_ID="${accountId}"
     }
   
-    $$ npx wrangler@${wranglerVersion} pages publish "${directory}" --project-name="${projectName}" --branch="${branch}"
+    $$ npx wrangler@${wranglerVersion} pages deploy "${directory}" --project-name="${projectName}" --branch="${branch}"
     `;
 
 		const response = await fetch(
@@ -68,7 +68,7 @@ try {
 			repo: context.repo.repo,
 			issue_number: context.issue.number
 		})
-		console.dir(comments)
+		console.dir(comments.data)
 		const deploymentComment = comments.data.find(c => !!c.performed_via_github_app?.id && c.body?.includes("Deploying with Cloudflare Pages"))
 		if (deploymentComment) {
 			// update comment
@@ -94,13 +94,14 @@ try {
 		const deployment = await octokit.rest.repos.createDeployment({
 			owner: context.repo.owner,
 			repo: context.repo.repo,
-			ref: context.sha,
+			ref: 'refs/pull/${{ github.event.number }}/merge' || context.sha,
 			auto_merge: false,
 			description: "Cloudflare Pages",
 			required_contexts: [],
 			environment,
 			production_environment: productionEnvironment,
 		});
+		console.log(deployment.data)
 
 		if (deployment.status === 201) {
 			return deployment.data;
@@ -196,7 +197,7 @@ try {
 				productionEnvironment,
 				octokit,
 			});
-			console.dir(deploymentStatus)
+			console.dir(deploymentStatus.data)
 		}
 	})();
 } catch (thrown) {
