@@ -94,7 +94,7 @@ try {
 		const deployment = await octokit.rest.repos.createDeployment({
 			owner: context.repo.owner,
 			repo: context.repo.repo,
-			ref: 'refs/pull/${{ github.event.number }}/merge' || context.sha,
+			ref: `refs/pull/${context.issue.number}/merge` || context.sha,
 			auto_merge: false,
 			description: "Cloudflare Pages",
 			required_contexts: [],
