@@ -1,4 +1,4 @@
-# Cloudflare Pages GitHub Action
+# Cloudflare Pages GitHub Action + Monorepo Support
 
 GitHub Action for creating Cloudflare Pages deployments, using the new [Direct Upload](https://developers.cloudflare.com/pages/platform/direct-upload/) feature and [Wrangler](https://developers.cloudflare.com/pages/platform/direct-upload/#wrangler-cli) integration.
 
@@ -217,3 +217,98 @@ By default, comments created by this action will show the GitHub Actions bot ava
    ```
 
 The Installation ID can be found in the URL when you visit the installation page of your GitHub App (`https://github.com/settings/installations/{INSTALLATION_ID}`).
+
+## Adding Reactions to Comments
+
+You can automatically add reactions to deployment comments by specifying them in your workflow:
+
+```yaml
+- name: Publish to Cloudflare Pages
+  uses: phojie/cloudflare-pages-action@main
+  with:
+    apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    projectName: your-project-name
+    directory: dist
+    # Add reactions to the deployment comment
+    reactions: |
+      rocket
+      hooray
+      heart
+```
+
+Supported reactions:
+- `+1` (👍)
+- `-1` (👎)
+- `laugh` (😄)
+- `confused` (😕)
+- `heart` (❤️)
+- `hooray` (🎉)
+- `rocket` (🚀)
+- `eyes` (👀)
+
+Custom emoji names like `tada`, `fire`, `sparkles`, `party_popper` will be mapped to appropriate GitHub reactions.
+
+### Complete Example with Custom App and Reactions
+
+Here's a complete example using both a custom GitHub App and adding reactions:
+
+```yaml
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          
+      - name: Install dependencies
+        run: pnpm install
+        
+      - name: Build
+        run: pnpm run build
+        
+      - name: Deploy to Cloudflare Pages
+        uses: phojie/cloudflare-pages-action@main
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: your-project-name
+          directory: dist
+          # GitHub App credentials for custom avatar
+          appId: ${{ secrets.GH_APP_ID }}
+          privateKey: ${{ secrets.GH_PRIVATE_KEY }}
+          installationId: ${{ secrets.GH_INSTALLATION_ID }}
+          # Add multiple reactions
+          reactions: |
+            rocket
+            heart
+            hooray
+```
+
+This will deploy your site, create a comment with your custom GitHub App avatar, and add three reactions to the comment.
+
+## Detailed Documentation
+
+For more detailed information and advanced usage, check out these guides:
+
+- [Setting up a GitHub App for Custom Avatars](docs/github-app-guide.md)
+- [Adding Reactions to Deployment Comments](docs/reactions-guide.md)
+

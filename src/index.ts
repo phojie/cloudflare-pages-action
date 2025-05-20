@@ -6,6 +6,26 @@ import { fetch } from "undici";
 import { env } from "process";
 import path from "node:path";
 
+// Helper function to get GitHub Actions run URL
+const getGitHubActionsRunUrl = () => {
+	const serverUrl = process.env.GITHUB_SERVER_URL || 'https://github.com';
+	const repository = process.env.GITHUB_REPOSITORY;
+	const runId = process.env.GITHUB_RUN_ID;
+	
+	if (!repository || !runId) {
+		return serverUrl;
+	}
+	
+	let url = `${serverUrl}/${repository}/actions/runs/${runId}`;
+	
+	// Add PR number if this is a pull request event
+	if (context.payload.pull_request) {
+		url += `?pr=${context.payload.pull_request.number}`;
+	}
+	
+	return url;
+};
+
 type Octokit = ReturnType<typeof getOctokit>;
 
 // Define a common type for deployment info
@@ -16,6 +36,8 @@ type DeploymentInfo = {
 	inspect_url: string;
 	updated: string;
 };
+
+const headerTitle = "🚀 Deploying your latest changes";
 
 // Helper function to extract deployments from comment body
 const extractDeploymentsFromComment = (
@@ -67,6 +89,10 @@ try {
 	const appId = getInput("appId", { required: false });
 	const privateKey = getInput("privateKey", { required: false });
 	const installationId = getInput("installationId", { required: false });
+	
+	// Get reactions input and parse it to an array
+	const reactionsInput = getInput("reactions", { required: false });
+	const reactions = reactionsInput ? reactionsInput.split('\n').map(r => r.trim()).filter(Boolean) : [];
 
 	const getProject = async () => {
 		const response = await fetch(
@@ -145,25 +171,83 @@ try {
 		});
 		if (debug) console.dir("comments.data", comments.data);
 		const deploymentComment = comments.data.find(
-			(c) => !!c.performed_via_github_app?.id && c.body?.includes("🚀 Deploying your latest changes")
+			(c) => !!c.performed_via_github_app?.id && c.body?.includes(headerTitle)
 		);
 		
+		let commentId: number;
 		// Update or create comment
 		if (deploymentComment) {
-			return octokit.rest.issues.updateComment({
+			const result = await octokit.rest.issues.updateComment({
 				owner: context.repo.owner,
 				repo: context.repo.repo,
 				issue_number: context.issue.number,
 				comment_id: deploymentComment.id,
 				body,
 			});
+			commentId = deploymentComment.id;
+			return result;
 		} else {
-			return octokit.rest.issues.createComment({
+			const result = await octokit.rest.issues.createComment({
 				owner: context.repo.owner,
 				repo: context.repo.repo,
 				issue_number: context.issue.number,
 				body,
 			});
+			commentId = result.data.id;
+			return result;
+		}
+	};
+
+	// Function to add reactions to a comment
+	const addReactionsToComment = async (octokit: Octokit, commentId: number, reactions: string[]) => {
+		if (!reactions.length) return;
+		
+		// Map common emoji names to GitHub reaction content values
+		const reactionMap: Record<string, string> = {
+			'+1': '+1',
+			'-1': '-1',
+			'laugh': 'laugh',
+			'confused': 'confused',
+			'heart': 'heart',
+			'hooray': 'hooray',
+			'rocket': 'rocket',
+			'eyes': 'eyes',
+		};
+		
+		// Add custom mappings for other emojis
+		const customMap: Record<string, string> = {
+			'tada': 'hooray',
+			'fire': 'hooray',
+			'sparkles': 'hooray',
+			'party_popper': 'hooray',
+			'party_blob': 'hooray',
+		};
+		
+		for (const reaction of reactions) {
+			try {
+				// Try to use a standard reaction or default to +1
+				let content: '+1' | '-1' | 'laugh' | 'confused' | 'heart' | 'hooray' | 'rocket' | 'eyes' = '+1';
+				
+				// Check if it's a standard reaction
+				const lowered = reaction.toLowerCase();
+				if (lowered in reactionMap) {
+					content = reactionMap[lowered] as '+1' | '-1' | 'laugh' | 'confused' | 'heart' | 'hooray' | 'rocket' | 'eyes';
+				} 
+				// Check if it's a custom mapped reaction
+				else if (lowered in customMap) {
+					content = customMap[lowered] as '+1' | '-1' | 'laugh' | 'confused' | 'heart' | 'hooray' | 'rocket' | 'eyes';
+				}
+				
+				await octokit.rest.reactions.createForIssueComment({
+					owner: context.repo.owner,
+					repo: context.repo.repo,
+					comment_id: commentId,
+					content,
+				});
+				if (debug) console.log(`Added reaction "${content}" to comment ${commentId}`);
+			} catch (error) {
+				console.warn(`Failed to add reaction "${reaction}" to comment: ${error}`);
+			}
 		}
 	};
 
@@ -200,6 +284,9 @@ try {
 		environmentName: string;
 		productionEnvironment: boolean;
 	}) => {
+		// Get GitHub Actions run URL for logs
+		const actionsRunUrl = getGitHubActionsRunUrl();
+			
 		return octokit.rest.repos.createDeploymentStatus({
 			owner: context.repo.owner,
 			repo: context.repo.repo,
@@ -208,7 +295,7 @@ try {
 			environment: environmentName,
 			environment_url: url,
 			production_environment: productionEnvironment,
-			log_url: `https://dash.cloudflare.com/${accountId}/pages/view/${projectName}/${deploymentId}`,
+			log_url: actionsRunUrl,
 			description: "Cloudflare Pages",
 			state: "success",
 			auto_inactive: false,
@@ -231,13 +318,15 @@ try {
 		// Format current deployment status
 		let statusIcon = "⚡️";
 		let statusText = "Deploying";
-		
+		let url_emoji = "⚡️";
 		if (deployStage?.status === "success") {
 			statusIcon = "✅";
 			statusText = "Ready";
+			url_emoji = "😎";
 		} else if (deployStage?.status === "failure") {
 			statusIcon = "🚫";
 			statusText = "Failed";
+			url_emoji = "💥";
 		}
 		
 		// Format date for "Updated" column
@@ -248,23 +337,23 @@ try {
 			hour: 'numeric',
 			minute: '2-digit',
 			timeZone: 'UTC',
-			hour12: false
+			hour12: true
 		});
 
-		// Format inspect URL
-		const inspectUrl = `https://dash.cloudflare.com/${accountId}/pages/view/${projectName}/${deployment.id}`;
+		// Format inspect URL - use GitHub Actions run URL only
+		const inspectUrl = getGitHubActionsRunUrl();
 		
 		// Add current deployment to the list
 		deployments.push({
 			name: projectName,
 			status: `${statusIcon} ${statusText} ([Inspect](${inspectUrl}))`,
-			url: aliasUrl,
+			url: `${url_emoji} [Visit Preview](${aliasUrl})`,
 			inspect_url: inspectUrl,
 			updated: updatedDate
 		});
 		
 		// Create summary table
-		let tableContent = `# 🚀 Deploying your latest changes
+		let tableContent = `## ${headerTitle}
 
 | Name | Status | Preview | Updated (UTC) |
 | ---- | ------ | ------- | ------------- |
@@ -272,7 +361,7 @@ try {
 
 		// Add all deployments to the table
 		for (const dep of deployments) {
-			tableContent += `| ${dep.name} | ${dep.status} | [Visit Preview](${dep.url}) | ${dep.updated} |\n`;
+			tableContent += `| ${dep.name} | ${dep.status} | ${dep.url} | ${dep.updated} |\n`;
 		}
 		
 		// Add commit info below the table
@@ -319,7 +408,7 @@ try {
 			});
 			
 			const deploymentComment = comments.data.find(
-				(c) => c.body?.includes("🚀 Deploying your latest changes")
+				(c) => c.body?.includes(headerTitle)
 			);
 			
 			if (deploymentComment && deploymentComment.body) {
@@ -334,7 +423,13 @@ try {
 			deployments: existingDeployments
 		});
 		
-		await createDeploymentComment(octokit, summaryContent);
+		const commentResult = await createDeploymentComment(octokit, summaryContent);
+		
+		// Add reactions to the comment if specified
+		if (commentResult && reactions.length > 0) {
+			const commentId = commentResult.data.id;
+			await addReactionsToComment(octokit, commentId, reactions);
+		}
 
 		if (gitHubDeployment) {
 			const deploymentStatus = await createGitHubDeploymentStatus({

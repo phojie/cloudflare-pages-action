@@ -34337,6 +34337,20 @@ var src_default = shellac;
 var import_undici = __toESM(require_undici());
 var import_process = require("process");
 var import_node_path = __toESM(require("path"));
+var getGitHubActionsRunUrl = () => {
+  const serverUrl = process.env.GITHUB_SERVER_URL || "https://github.com";
+  const repository = process.env.GITHUB_REPOSITORY;
+  const runId = process.env.GITHUB_RUN_ID;
+  if (!repository || !runId) {
+    return serverUrl;
+  }
+  let url = `${serverUrl}/${repository}/actions/runs/${runId}`;
+  if (import_github.context.payload.pull_request) {
+    url += `?pr=${import_github.context.payload.pull_request.number}`;
+  }
+  return url;
+};
+var headerTitle = "\u{1F680} Deploying your latest changes";
 var extractDeploymentsFromComment = (commentBody, currentProjectName) => {
   const deployments = [];
   const tableRows = commentBody.match(/\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|/g);
@@ -34373,6 +34387,8 @@ try {
   const appId = (0, import_core.getInput)("appId", { required: false });
   const privateKey = (0, import_core.getInput)("privateKey", { required: false });
   const installationId = (0, import_core.getInput)("installationId", { required: false });
+  const reactionsInput = (0, import_core.getInput)("reactions", { required: false });
+  const reactions = reactionsInput ? reactionsInput.split("\n").map((r) => r.trim()).filter(Boolean) : [];
   const getProject = async () => {
     const response = await (0, import_undici.fetch)(
       `https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects/${projectName}`,
@@ -34433,23 +34449,70 @@ try {
     if (debug)
       console.dir("comments.data", comments.data);
     const deploymentComment = comments.data.find(
-      (c) => !!c.performed_via_github_app?.id && c.body?.includes("\u{1F680} Deploying your latest changes")
+      (c) => !!c.performed_via_github_app?.id && c.body?.includes(headerTitle)
     );
+    let commentId;
     if (deploymentComment) {
-      return octokit.rest.issues.updateComment({
+      const result = await octokit.rest.issues.updateComment({
         owner: import_github.context.repo.owner,
         repo: import_github.context.repo.repo,
         issue_number: import_github.context.issue.number,
         comment_id: deploymentComment.id,
         body
       });
+      commentId = deploymentComment.id;
+      return result;
     } else {
-      return octokit.rest.issues.createComment({
+      const result = await octokit.rest.issues.createComment({
         owner: import_github.context.repo.owner,
         repo: import_github.context.repo.repo,
         issue_number: import_github.context.issue.number,
         body
       });
+      commentId = result.data.id;
+      return result;
+    }
+  };
+  const addReactionsToComment = async (octokit, commentId, reactions2) => {
+    if (!reactions2.length)
+      return;
+    const reactionMap = {
+      "+1": "+1",
+      "-1": "-1",
+      "laugh": "laugh",
+      "confused": "confused",
+      "heart": "heart",
+      "hooray": "hooray",
+      "rocket": "rocket",
+      "eyes": "eyes"
+    };
+    const customMap = {
+      "tada": "hooray",
+      "fire": "hooray",
+      "sparkles": "hooray",
+      "party_popper": "hooray",
+      "party_blob": "hooray"
+    };
+    for (const reaction of reactions2) {
+      try {
+        let content = "+1";
+        const lowered = reaction.toLowerCase();
+        if (lowered in reactionMap) {
+          content = reactionMap[lowered];
+        } else if (lowered in customMap) {
+          content = customMap[lowered];
+        }
+        await octokit.rest.reactions.createForIssueComment({
+          owner: import_github.context.repo.owner,
+          repo: import_github.context.repo.repo,
+          comment_id: commentId,
+          content
+        });
+        if (debug)
+          console.log(`Added reaction "${content}" to comment ${commentId}`);
+      } catch (error) {
+        console.warn(`Failed to add reaction "${reaction}" to comment: ${error}`);
+      }
     }
   };
   const createGitHubDeployment = async (octokit, productionEnvironment, environment) => {
@@ -34477,6 +34540,7 @@ try {
     productionEnvironment,
     octokit
   }) => {
+    const actionsRunUrl = getGitHubActionsRunUrl();
     return octokit.rest.repos.createDeploymentStatus({
       owner: import_github.context.repo.owner,
       repo: import_github.context.repo.repo,
@@ -34484,7 +34548,7 @@ try {
       environment: environmentName,
       environment_url: url,
       production_environment: productionEnvironment,
-      log_url: `https://dash.cloudflare.com/${accountId}/pages/view/${projectName}/${deploymentId}`,
+      log_url: actionsRunUrl,
       description: "Cloudflare Pages",
       state: "success",
       auto_inactive: false
@@ -34499,12 +34563,15 @@ try {
     const deployStage = deployment.stages.find((stage) => stage.name === "deploy");
     let statusIcon = "\u26A1\uFE0F";
     let statusText = "Deploying";
+    let url_emoji = "\u26A1\uFE0F";
     if (deployStage?.status === "success") {
       statusIcon = "\u2705";
       statusText = "Ready";
+      url_emoji = "\u{1F60E}";
     } else if (deployStage?.status === "failure") {
       statusIcon = "\u{1F6AB}";
       statusText = "Failed";
+      url_emoji = "\u{1F4A5}";
     }
     const updatedDate = new Date().toLocaleString("en-US", {
       month: "short",
@@ -34513,23 +34580,23 @@ try {
       hour: "numeric",
       minute: "2-digit",
       timeZone: "UTC",
-      hour12: false
+      hour12: true
     });
-    const inspectUrl = `https://dash.cloudflare.com/${accountId}/pages/view/${projectName}/${deployment.id}`;
+    const inspectUrl = getGitHubActionsRunUrl();
     deployments.push({
       name: projectName,
       status: `${statusIcon} ${statusText} ([Inspect](${inspectUrl}))`,
-      url: aliasUrl,
+      url: `${url_emoji} [Visit Preview](${aliasUrl})`,
       inspect_url: inspectUrl,
       updated: updatedDate
     });
-    let tableContent = `# \u{1F680} Deploying your latest changes
+    let tableContent = `## ${headerTitle}
 
 | Name | Status | Preview | Updated (UTC) |
 | ---- | ------ | ------- | ------------- |
 `;
     for (const dep of deployments) {
-      tableContent += `| ${dep.name} | ${dep.status} | [Visit Preview](${dep.url}) | ${dep.updated} |
+      tableContent += `| ${dep.name} | ${dep.status} | ${dep.url} | ${dep.updated} |
 `;
     }
     tableContent += `
@@ -34565,7 +34632,7 @@ try {
         issue_number: import_github.context.issue.number
       });
       const deploymentComment = comments.data.find(
-        (c) => c.body?.includes("\u{1F680} Deploying your latest changes")
+        (c) => c.body?.includes(headerTitle)
       );
       if (deploymentComment && deploymentComment.body) {
         existingDeployments = extractDeploymentsFromComment(deploymentComment.body, projectName);
@@ -34577,7 +34644,11 @@ try {
       productionEnvironment,
       deployments: existingDeployments
     });
-    await createDeploymentComment(octokit, summaryContent);
+    const commentResult = await createDeploymentComment(octokit, summaryContent);
+    if (commentResult && reactions.length > 0) {
+      const commentId = commentResult.data.id;
+      await addReactionsToComment(octokit, commentId, reactions);
+    }
     if (gitHubDeployment) {
       const deploymentStatus = await createGitHubDeploymentStatus({
         id: gitHubDeployment.id,

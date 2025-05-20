@@ -42,6 +42,9 @@ inputs:
   installationId:
     description: "GitHub App installation ID"
     required: false
+  reactions:
+    description: "List of reactions to add to comments (separated by newlines)"
+    required: false
 runs:
   using: "node16"
   main: "index.js"
