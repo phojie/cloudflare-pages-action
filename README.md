@@ -2,6 +2,17 @@
 
 GitHub Action for creating Cloudflare Pages deployments, using the new [Direct Upload](https://developers.cloudflare.com/pages/platform/direct-upload/) feature and [Wrangler](https://developers.cloudflare.com/pages/platform/direct-upload/#wrangler-cli) integration.
 
+## Features
+
+- Seamlessly deploy your static site to Cloudflare Pages
+- GitHub Deployment integration
+- Automatic PR comments with deployment status
+- Detailed job summary
+- Multi-deployment support for monorepo projects
+  - Automatically detects multiple deployments in the same repository
+  - Merges deployment information into a single table
+  - Updates information about all deployments with each new deployment
+
 ## Usage
 
 1. Create an API token in the Cloudflare dashboard with the "Cloudflare Pages — Edit" permission.
@@ -46,7 +57,7 @@ GitHub Action for creating Cloudflare Pages deployments, using the new [Direct U
 
 ### Get account ID
 
-To find your account ID, log in to the Cloudflare dashboard > select your zone in Account Home > find your account ID in Overview under **API** on the right-side menu. If you have not added a zone, add one by selecting **Add site** . You can purchase a domain from [Cloudflare’s registrar](https://developers.cloudflare.com/registrar/).
+To find your account ID, log in to the Cloudflare dashboard > select your zone in Account Home > find your account ID in Overview under **API** on the right-side menu. If you have not added a zone, add one by selecting **Add site** . You can purchase a domain from [Cloudflare's registrar](https://developers.cloudflare.com/registrar/).
 
 If you do not have a zone registered to your account, you can also get your account ID from the `pages.dev` URL. E.g: `https://dash.cloudflare.com/<ACCOUNT_ID>/pages`
 
@@ -80,18 +91,6 @@ By default Wrangler will run in the root package directory. If your app lives in
 
 You can use the newly released [Wrangler v3](https://blog.cloudflare.com/wrangler3/) with the `wranglerVersion` property.
 
-```yaml
-  - name: Publish to Cloudflare Pages
-    uses: cloudflare/pages-action@v1
-    with:
-      apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      accountId: YOUR_ACCOUNT_ID
-      projectName: YOUR_PROJECT_NAME
-      directory: YOUR_BUILD_OUTPUT_DIRECTORY
-      # Enable Wrangler v3
-      wranglerVersion: '3'
-```
-
 ## Outputs
 
 | Name          | Description                                         |
@@ -100,3 +99,78 @@ You can use the newly released [Wrangler v3](https://blog.cloudflare.com/wrangle
 | `url`         | The URL of the pages deployment                     |
 | `alias`       | The alias if it exists otherwise the deployment URL |
 | `environment` | The environment that was deployed to                |
+
+## Monorepo Example
+
+If you have a monorepo with multiple Cloudflare Pages projects, you can use this action to deploy them all in a single workflow. Here's an example:
+
+```yaml
+name: Deploy Cloudflare Pages Projects
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  deploy-docs:
+    runs-on: ubuntu-latest
+    name: Deploy Docs Site
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build Docs
+        run: |
+          cd docs
+          npm ci
+          npm run build
+      - name: Publish to Cloudflare Pages
+        uses: phojie/cloudflare-pages-action@main
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: my-docs-site
+          directory: docs/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          
+  deploy-marketing:
+    runs-on: ubuntu-latest
+    name: Deploy Marketing Site
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build Marketing Site
+        run: |
+          cd marketing
+          npm ci
+          npm run build
+      - name: Publish to Cloudflare Pages
+        uses: phojie/cloudflare-pages-action@main
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: my-marketing-site
+          directory: marketing/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-app:
+    runs-on: ubuntu-latest
+    name: Deploy Main App
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build App
+        run: |
+          cd app
+          npm ci
+          npm run build
+      - name: Publish to Cloudflare Pages
+        uses: phojie/cloudflare-pages-action@main
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: my-main-app
+          directory: app/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+```
+
+This will deploy all three projects and maintain a single deployment summary in the pull request comment, showing the status of all deployments in one view.

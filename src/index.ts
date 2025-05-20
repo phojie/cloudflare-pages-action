@@ -8,6 +8,50 @@ import path from "node:path";
 
 type Octokit = ReturnType<typeof getOctokit>;
 
+// Define a common type for deployment info
+type DeploymentInfo = {
+	name: string;
+	status: string;
+	url: string;
+	inspect_url: string;
+	updated: string;
+};
+
+// Helper function to extract deployments from comment body
+const extractDeploymentsFromComment = (
+	commentBody: string,
+	currentProjectName: string
+): DeploymentInfo[] => {
+	const deployments: DeploymentInfo[] = [];
+	
+	// Try to extract existing deployments from the table
+	const tableRows = commentBody.match(/\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|/g);
+	if (tableRows && tableRows.length > 2) { // Skip header and separator rows
+		for (let i = 2; i < tableRows.length; i++) {
+			const row = tableRows[i];
+			const cells = row.split('|').map(cell => cell.trim()).filter(Boolean);
+			if (cells.length >= 4) {
+				const name = cells[0];
+				const status = cells[1];
+				// Extract URL from markdown link in Preview column
+				const urlMatch = cells[2].match(/\[([^\]]+)\]\(([^)]+)\)/);
+				const url = urlMatch ? urlMatch[2] : '';
+				// Extract inspect URL from markdown link in Status column
+				const inspectUrlMatch = cells[1].match(/\[([^\]]+)\]\(([^)]+)\)/);
+				const inspect_url = inspectUrlMatch ? inspectUrlMatch[2] : '';
+				const updated = cells[3];
+				
+				// Only add if it's not the current project being updated
+				if (name !== currentProjectName) {
+					deployments.push({ name, status, url, inspect_url, updated });
+				}
+			}
+		}
+	}
+	
+	return deployments;
+};
+
 try {
 	const apiToken = getInput("apiToken", { required: true });
 	const accountId = getInput("accountId", { required: true });
@@ -64,34 +108,36 @@ try {
 	const githubBranch = env.GITHUB_HEAD_REF || env.GITHUB_REF_NAME;
 
 	const createDeploymentComment = async (octokit: Octokit, body: string) => {
-		if (!context.issue.number) return
+		if (!context.issue.number) return;
 
 		const comments = await octokit.rest.issues.listComments({
 			owner: context.repo.owner,
 			repo: context.repo.repo,
-			issue_number: context.issue.number
-		})
-		if (debug) console.dir("comments.data", comments.data)
-		const deploymentComment = comments.data.find(c => !!c.performed_via_github_app?.id && c.body?.includes("Deploying with Cloudflare Pages"))
+			issue_number: context.issue.number,
+		});
+		if (debug) console.dir("comments.data", comments.data);
+		const deploymentComment = comments.data.find(
+			(c) => !!c.performed_via_github_app?.id && c.body?.includes("Deploying with Cloudflare Pages")
+		);
+		
+		// Update or create comment
 		if (deploymentComment) {
-			// update comment
 			return octokit.rest.issues.updateComment({
 				owner: context.repo.owner,
 				repo: context.repo.repo,
 				issue_number: context.issue.number,
 				comment_id: deploymentComment.id,
 				body,
-			})
+			});
 		} else {
-			// create comment
 			return octokit.rest.issues.createComment({
 				owner: context.repo.owner,
 				repo: context.repo.repo,
 				issue_number: context.issue.number,
-				body
-			})
+				body,
+			});
 		}
-	}
+	};
 
 	const createGitHubDeployment = async (octokit: Octokit, productionEnvironment: boolean, environment: string) => {
 		const deployment = await octokit.rest.repos.createDeployment({
@@ -141,27 +187,71 @@ try {
 		});
 	};
 
-	const createJobSummary = async ({ deployment, aliasUrl }: { deployment: Deployment; aliasUrl: string }) => {
+	const createJobSummary = async ({
+		deployment,
+		aliasUrl,
+		productionEnvironment,
+		deployments = [],
+	}: {
+		deployment: Deployment;
+		aliasUrl: string;
+		productionEnvironment: boolean;
+		deployments?: DeploymentInfo[];
+	}) => {
 		const deployStage = deployment.stages.find((stage) => stage.name === "deploy");
 
-		let status = "⚡️  Deployment in progress...";
+		// Format current deployment status
+		let statusIcon = "⚡️";
+		let statusText = "Deploying";
+		
 		if (deployStage?.status === "success") {
-			status = "✅  Deploy successful!";
+			statusIcon = "✅";
+			statusText = "Ready";
 		} else if (deployStage?.status === "failure") {
-			status = "🚫  Deployment failed";
+			statusIcon = "🚫";
+			statusText = "Failed";
 		}
+		
+		// Format date for "Updated" column
+		const updatedDate = new Date().toLocaleString('en-US', {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric',
+			hour: 'numeric',
+			minute: '2-digit',
+			timeZone: 'UTC',
+			hour12: false
+		});
 
-		const summaryBody = `# Deploying with Cloudflare Pages
+		// Format inspect URL
+		const inspectUrl = `https://dash.cloudflare.com/${accountId}/pages/view/${projectName}/${deployment.id}`;
+		
+		// Add current deployment to the list
+		deployments.push({
+			name: projectName,
+			status: `${statusIcon} ${statusText} ([Inspect](${inspectUrl}))`,
+			url: aliasUrl,
+			inspect_url: inspectUrl,
+			updated: updatedDate
+		});
+		
+		// Create summary table
+		let tableContent = `# 🚀 Deploying your latest changes
 
-| Name                    | Result |
-| ----------------------- | - |
-| **Last commit:**        | \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\` |
-| **Status**:             | ${status} |
-| **Preview URL**:        | ${deployment.url} |
-| **Branch Preview URL**: | ${aliasUrl} |`
+| Name | Status | Preview | Updated (UTC) |
+| ---- | ------ | ------- | ------------- |
+`;
 
-		await summary.addRaw(summaryBody).write();
-		return summaryBody
+		// Add all deployments to the table
+		for (const dep of deployments) {
+			tableContent += `| ${dep.name} | ${dep.status} | [Visit Preview](${dep.url}) | ${dep.updated} |\n`;
+		}
+		
+		// Add commit info below the table
+		tableContent += `\n**Latest commit:** \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\``;
+
+		await summary.addRaw(tableContent).write();
+		return tableContent;
 	};
 
 	(async () => {
@@ -178,7 +268,7 @@ try {
 		}
 
 		const pagesDeployment = await createPagesDeployment();
-		if (debug) console.dir("pagesDeployment", pagesDeployment)
+		if (debug) console.dir("pagesDeployment", pagesDeployment);
 		setOutput("id", pagesDeployment.id);
 		setOutput("url", pagesDeployment.url);
 		setOutput("environment", pagesDeployment.environment);
@@ -189,8 +279,33 @@ try {
 		}
 		setOutput("alias", alias);
 
-		const summary = await createJobSummary({ deployment: pagesDeployment, aliasUrl: alias });
-		await createDeploymentComment(octokit, summary)
+		// Get existing deployments from comment if available
+		let existingDeployments: DeploymentInfo[] = [];
+		
+		if (gitHubToken && gitHubToken.length && context.issue.number) {
+			const comments = await octokit.rest.issues.listComments({
+				owner: context.repo.owner,
+				repo: context.repo.repo,
+				issue_number: context.issue.number,
+			});
+			
+			const deploymentComment = comments.data.find(
+				(c) => !!c.performed_via_github_app?.id && c.body?.includes("Deploying with Cloudflare Pages")
+			);
+			
+			if (deploymentComment && deploymentComment.body) {
+				existingDeployments = extractDeploymentsFromComment(deploymentComment.body, projectName);
+			}
+		}
+
+		const summaryContent = await createJobSummary({ 
+			deployment: pagesDeployment, 
+			aliasUrl: alias, 
+			productionEnvironment,
+			deployments: existingDeployments
+		});
+		
+		await createDeploymentComment(octokit, summaryContent);
 
 		if (gitHubDeployment) {
 			const deploymentStatus = await createGitHubDeploymentStatus({
@@ -201,7 +316,7 @@ try {
 				productionEnvironment,
 				octokit,
 			});
-			if (debug) console.dir("deploymentStatus.data", deploymentStatus.data)
+			if (debug) console.dir("deploymentStatus.data", deploymentStatus.data);
 		}
 	})();
 } catch (thrown) {
