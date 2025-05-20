@@ -34596,7 +34596,8 @@ try {
 | ---- | ------ | ------- | ------------- |
 `;
     for (const dep of deployments) {
-      tableContent += `| ${dep.name} | ${dep.status} | ${dep.url} | ${dep.updated} |
+      const nameCell = dep.name === projectName ? `**${dep.name}**` : dep.name;
+      tableContent += `| ${nameCell} | ${dep.status} | ${dep.url} | ${dep.updated} |
 `;
     }
     tableContent += `

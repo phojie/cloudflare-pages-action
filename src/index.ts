@@ -363,7 +363,9 @@ try {
 
 		// Add all deployments to the table
 		for (const dep of deployments) {
-			tableContent += `| ${dep.name} | ${dep.status} | ${dep.url} | ${dep.updated} |\n`;
+			// Make the project name bold if it matches the current project
+			const nameCell = dep.name === projectName ? `**${dep.name}**` : dep.name;
+			tableContent += `| ${nameCell} | ${dep.status} | ${dep.url} | ${dep.updated} |\n`;
 		}
 		
 		// Add commit info below the table
