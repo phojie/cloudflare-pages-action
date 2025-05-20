@@ -29,6 +29,19 @@ inputs:
     description: "The version of Wrangler to use"
     required: false
     default: "2"
+  debug:
+    description: "Enable debug mode for additional logging"
+    required: false
+    default: "false"
+  appId:
+    description: "GitHub App ID (to use a GitHub App instead of a token for custom avatars in comments)"
+    required: false
+  privateKey:
+    description: "GitHub App private key (Base64 encoded)"
+    required: false
+  installationId:
+    description: "GitHub App installation ID"
+    required: false
 runs:
-  using: "node20"
+  using: "node16"
   main: "index.js"

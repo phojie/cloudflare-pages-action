@@ -62,6 +62,11 @@ try {
 	const workingDirectory = getInput("workingDirectory", { required: false });
 	const wranglerVersion = getInput("wranglerVersion", { required: false });
 	const debug = getInput("debug", { required: false });
+	
+	// GitHub App authentication inputs
+	const appId = getInput("appId", { required: false });
+	const privateKey = getInput("privateKey", { required: false });
+	const installationId = getInput("installationId", { required: false });
 
 	const getProject = async () => {
 		const response = await fetch(
@@ -107,6 +112,29 @@ try {
 
 	const githubBranch = env.GITHUB_HEAD_REF || env.GITHUB_REF_NAME;
 
+	// Initialize GitHub Octokit with appropriate token
+	const getOctokitClient = async (): Promise<Octokit> => {
+		// If GitHub App credentials are provided, use them to generate an installation token
+		if (appId && privateKey && installationId) {
+			// Dynamically import @octokit/auth-app to avoid adding it as a direct dependency
+			const { createAppAuth } = await import('@octokit/auth-app');
+			
+			const auth = createAppAuth({
+				appId,
+				privateKey,
+				installationId,
+			});
+			
+			// Generate an installation token
+			const { token } = await auth({ type: 'installation' });
+			
+			return getOctokit(token);
+		}
+		
+		// Otherwise, use the provided GitHub token
+		return getOctokit(gitHubToken);
+	};
+
 	const createDeploymentComment = async (octokit: Octokit, body: string) => {
 		if (!context.issue.number) return;
 
@@ -117,7 +145,7 @@ try {
 		});
 		if (debug) console.dir("comments.data", comments.data);
 		const deploymentComment = comments.data.find(
-			(c) => !!c.performed_via_github_app?.id && c.body?.includes("Deploying with Cloudflare Pages")
+			(c) => !!c.performed_via_github_app?.id && c.body?.includes("🚀 Deploying your latest changes")
 		);
 		
 		// Update or create comment
@@ -255,7 +283,8 @@ try {
 	};
 
 	(async () => {
-		const octokit = getOctokit(gitHubToken);
+		// Get Octokit client with appropriate authentication
+		const octokit = await getOctokitClient();
 		const project = await getProject();
 
 		const productionEnvironment = githubBranch === project.production_branch || branch === project.production_branch;
@@ -263,7 +292,7 @@ try {
 
 		let gitHubDeployment: Awaited<ReturnType<typeof createGitHubDeployment>>;
 
-		if (gitHubToken && gitHubToken.length) {
+		if ((gitHubToken && gitHubToken.length) || (appId && privateKey && installationId)) {
 			gitHubDeployment = await createGitHubDeployment(octokit, productionEnvironment, environmentName);
 		}
 
@@ -282,7 +311,7 @@ try {
 		// Get existing deployments from comment if available
 		let existingDeployments: DeploymentInfo[] = [];
 		
-		if (gitHubToken && gitHubToken.length && context.issue.number) {
+		if (((gitHubToken && gitHubToken.length) || (appId && privateKey && installationId)) && context.issue.number) {
 			const comments = await octokit.rest.issues.listComments({
 				owner: context.repo.owner,
 				repo: context.repo.repo,
@@ -290,7 +319,7 @@ try {
 			});
 			
 			const deploymentComment = comments.data.find(
-				(c) => !!c.performed_via_github_app?.id && c.body?.includes("Deploying with Cloudflare Pages")
+				(c) => c.body?.includes("🚀 Deploying your latest changes")
 			);
 			
 			if (deploymentComment && deploymentComment.body) {

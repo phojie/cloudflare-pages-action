@@ -174,3 +174,46 @@ jobs:
 ```
 
 This will deploy all three projects and maintain a single deployment summary in the pull request comment, showing the status of all deployments in one view.
+
+## Using a Custom GitHub App for Comments
+
+By default, comments created by this action will show the GitHub Actions bot avatar. If you want to use a custom avatar (like the triangular logo shown in the screenshots), you can create a GitHub App:
+
+1. **Create a GitHub App**
+   - Go to your GitHub account settings > Developer settings > GitHub Apps
+   - Click "New GitHub App"
+   - Fill in the required fields:
+     - Name: "Cloudflare Pages Deployer" (or your preferred name)
+     - Homepage URL: Your repo URL
+     - Webhook: Disable it (uncheck "Active")
+   - Set permissions:
+     - Issues: Read & Write
+     - Pull requests: Read & Write
+   - Upload your custom logo/avatar
+   - Create the app
+
+2. **Install the App to your repositories**
+   - After creating, click "Install App"
+   - Select which repositories to enable it for
+
+3. **Generate a private key**
+   - In your app settings, scroll down to "Private keys"
+   - Click "Generate a private key"
+   - Download the key file
+
+4. **Use the App in your workflow**
+   ```yaml
+   - name: Publish to Cloudflare Pages
+     uses: phojie/cloudflare-pages-action@main
+     with:
+       apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+       accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+       projectName: your-project-name
+       directory: dist
+       # GitHub App credentials instead of gitHubToken
+       appId: ${{ secrets.GH_APP_ID }}
+       privateKey: ${{ secrets.GH_PRIVATE_KEY }}
+       installationId: ${{ secrets.GH_INSTALLATION_ID }}
+   ```
+
+The Installation ID can be found in the URL when you visit the installation page of your GitHub App (`https://github.com/settings/installations/{INSTALLATION_ID}`).

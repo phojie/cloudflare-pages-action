@@ -25,6 +25,7 @@
 		"@actions/core": "^1.10.1",
 		"@actions/github": "^6.0.0",
 		"@cloudflare/types": "^6.18.16",
+		"@octokit/auth-app": "^4.0.13",
 		"shellac": "^0.7.2",
 		"undici": "^5.11.0"
 	},
