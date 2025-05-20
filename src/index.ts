@@ -8,21 +8,21 @@ import path from "node:path";
 
 // Helper function to get GitHub Actions run URL
 const getGitHubActionsRunUrl = () => {
-	const serverUrl = process.env.GITHUB_SERVER_URL || 'https://github.com';
+	const serverUrl = process.env.GITHUB_SERVER_URL || "https://github.com";
 	const repository = process.env.GITHUB_REPOSITORY;
 	const runId = process.env.GITHUB_RUN_ID;
-	
+
 	if (!repository || !runId) {
 		return serverUrl;
 	}
-	
+
 	let url = `${serverUrl}/${repository}/actions/runs/${runId}`;
-	
+
 	// Add PR number if this is a pull request event
 	if (context.payload.pull_request) {
 		url += `?pr=${context.payload.pull_request.number}`;
 	}
-	
+
 	return url;
 };
 
@@ -39,31 +39,48 @@ type DeploymentInfo = {
 
 const headerTitle = "🚀 Deploying your latest changes";
 
+// Helper function to extract domain from URL
+const extractDomainFromUrl = (url: string): string | null => {
+	try {
+		// Remove protocol and get domain
+		const match = url.match(/^(?:https?:\/\/)?([^\/]+)/i);
+		return match ? match[1] : null;
+	} catch (error) {
+		console.warn(`Failed to extract domain from URL: ${url}`);
+		return null;
+	}
+};
+
+// Helper function to generate performance badge for a URL
+const getPerformanceBadge = (url: string): string => {
+	const domain = extractDomainFromUrl(url);
+	if (!domain) return "";
+
+	return `\n[![Performance](https://page-speed.dev/badge/${domain})](https://page-speed.dev/${domain})`;
+};
+
 // Helper function to extract deployments from comment body
-const extractDeploymentsFromComment = (
-	commentBody: string,
-	currentProjectName: string
-): DeploymentInfo[] => {
+const extractDeploymentsFromComment = (commentBody: string, currentProjectName: string): DeploymentInfo[] => {
 	const deployments: DeploymentInfo[] = [];
-	
-	// Try to extract existing deployments from the table
-	const tableRows = commentBody.match(/\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|/g);
-	if (tableRows && tableRows.length > 2) { // Skip header and separator rows
-		for (let i = 2; i < tableRows.length; i++) {
-			const row = tableRows[i];
-			const cells = row.split('|').map(cell => cell.trim()).filter(Boolean);
-			if (cells.length >= 4) {
-				const name = cells[0];
-				const status = cells[1];
-				
-				// Instead of extracting just the URL, preserve the entire preview cell content
-				const url = cells[2];
-				
+
+	// Try to extract existing deployments from the table - using a more robust regex that handles multiline cells
+	const tableRegex = /\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|\s*([\s\S]*?)\s*\|\s*([^|]*?)\s*\|/g;
+	const matches = [...commentBody.matchAll(tableRegex)];
+
+	// Skip header and separator rows
+	if (matches.length > 2) {
+		for (let i = 2; i < matches.length; i++) {
+			const match = matches[i];
+			if (match.length >= 5) {
+				const name = match[1].trim();
+				const status = match[2].trim();
+				const url = match[3].trim();
+				const updated = match[4].trim();
+
 				// Extract inspect URL from markdown link in Status column
-				const inspectUrlMatch = cells[1].match(/\[Inspect\]\(([^)]+)\)/);
-				const inspect_url = inspectUrlMatch ? inspectUrlMatch[1] : '';
-				const updated = cells[3];
-				
+				const inspectUrlMatch = status.match(/\[Inspect\]\(([^)]+)\)/);
+				const inspect_url = inspectUrlMatch ? inspectUrlMatch[1] : "";
+
 				// Only add if it's not the current project being updated
 				if (name !== currentProjectName) {
 					deployments.push({ name, status, url, inspect_url, updated });
@@ -71,7 +88,7 @@ const extractDeploymentsFromComment = (
 			}
 		}
 	}
-	
+
 	return deployments;
 };
 
@@ -86,15 +103,20 @@ try {
 	const wranglerVersion = getInput("wranglerVersion", { required: false });
 	const debug = getInput("debug", { required: false });
 	const timezone = getInput("timezone", { required: false }) || "UTC";
-	
+
 	// GitHub App authentication inputs
 	const appId = getInput("appId", { required: false });
 	const privateKey = getInput("privateKey", { required: false });
 	const installationId = getInput("installationId", { required: false });
-	
+
 	// Get reactions input and parse it to an array
 	const reactionsInput = getInput("reactions", { required: false });
-	const reactions = reactionsInput ? reactionsInput.split('\n').map(r => r.trim()).filter(Boolean) : [];
+	const reactions = reactionsInput
+		? reactionsInput
+				.split("\n")
+				.map((r) => r.trim())
+				.filter(Boolean)
+		: [];
 
 	const getProject = async () => {
 		const response = await fetch(
@@ -145,20 +167,20 @@ try {
 		// If GitHub App credentials are provided, use them to generate an installation token
 		if (appId && privateKey && installationId) {
 			// Dynamically import @octokit/auth-app to avoid adding it as a direct dependency
-			const { createAppAuth } = await import('@octokit/auth-app');
-			
+			const { createAppAuth } = await import("@octokit/auth-app");
+
 			const auth = createAppAuth({
 				appId,
 				privateKey,
 				installationId,
 			});
-			
+
 			// Generate an installation token
-			const { token } = await auth({ type: 'installation' });
-			
+			const { token } = await auth({ type: "installation" });
+
 			return getOctokit(token);
 		}
-		
+
 		// Otherwise, use the provided GitHub token
 		return getOctokit(gitHubToken);
 	};
@@ -172,10 +194,8 @@ try {
 			issue_number: context.issue.number,
 		});
 		if (debug) console.dir("comments.data", comments.data);
-		const deploymentComment = comments.data.find(
-			(c) => c.body?.includes(headerTitle)
-		);
-		
+		const deploymentComment = comments.data.find((c) => c.body?.includes(headerTitle));
+
 		let commentId: number;
 		// Update or create comment
 		if (deploymentComment) {
@@ -203,43 +223,43 @@ try {
 	// Function to add reactions to a comment
 	const addReactionsToComment = async (octokit: Octokit, commentId: number, reactions: string[]) => {
 		if (!reactions.length) return;
-		
+
 		// Map common emoji names to GitHub reaction content values
 		const reactionMap: Record<string, string> = {
-			'+1': '+1',
-			'-1': '-1',
-			'laugh': 'laugh',
-			'confused': 'confused',
-			'heart': 'heart',
-			'hooray': 'hooray',
-			'rocket': 'rocket',
-			'eyes': 'eyes',
+			"+1": "+1",
+			"-1": "-1",
+			laugh: "laugh",
+			confused: "confused",
+			heart: "heart",
+			hooray: "hooray",
+			rocket: "rocket",
+			eyes: "eyes",
 		};
-		
+
 		// Add custom mappings for other emojis
 		const customMap: Record<string, string> = {
-			'tada': 'hooray',
-			'fire': 'hooray',
-			'sparkles': 'hooray',
-			'party_popper': 'hooray',
-			'party_blob': 'hooray',
+			tada: "hooray",
+			fire: "hooray",
+			sparkles: "hooray",
+			party_popper: "hooray",
+			party_blob: "hooray",
 		};
-		
+
 		for (const reaction of reactions) {
 			try {
 				// Try to use a standard reaction or default to +1
-				let content: '+1' | '-1' | 'laugh' | 'confused' | 'heart' | 'hooray' | 'rocket' | 'eyes' = '+1';
-				
+				let content: "+1" | "-1" | "laugh" | "confused" | "heart" | "hooray" | "rocket" | "eyes" = "+1";
+
 				// Check if it's a standard reaction
 				const lowered = reaction.toLowerCase();
 				if (lowered in reactionMap) {
-					content = reactionMap[lowered] as '+1' | '-1' | 'laugh' | 'confused' | 'heart' | 'hooray' | 'rocket' | 'eyes';
-				} 
+					content = reactionMap[lowered] as "+1" | "-1" | "laugh" | "confused" | "heart" | "hooray" | "rocket" | "eyes";
+				}
 				// Check if it's a custom mapped reaction
 				else if (lowered in customMap) {
-					content = customMap[lowered] as '+1' | '-1' | 'laugh' | 'confused' | 'heart' | 'hooray' | 'rocket' | 'eyes';
+					content = customMap[lowered] as "+1" | "-1" | "laugh" | "confused" | "heart" | "hooray" | "rocket" | "eyes";
 				}
-				
+
 				await octokit.rest.reactions.createForIssueComment({
 					owner: context.repo.owner,
 					repo: context.repo.repo,
@@ -264,7 +284,7 @@ try {
 			environment,
 			production_environment: productionEnvironment,
 		});
-		if (debug) console.dir("deployment.data", deployment.data)
+		if (debug) console.dir("deployment.data", deployment.data);
 
 		if (deployment.status === 201) {
 			return deployment.data;
@@ -288,7 +308,7 @@ try {
 	}) => {
 		// Get GitHub Actions run URL for logs
 		const actionsRunUrl = getGitHubActionsRunUrl();
-			
+
 		return octokit.rest.repos.createDeploymentStatus({
 			owner: context.repo.owner,
 			repo: context.repo.repo,
@@ -330,34 +350,37 @@ try {
 			statusText = "Failed";
 			url_emoji = "💥";
 		}
-		
+
 		// Format date for "Updated" column with configurable timezone
-		const updatedDate = new Date().toLocaleString('en-US', {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric',
-			hour: 'numeric',
-			minute: '2-digit',
+		const updatedDate = new Date().toLocaleString("en-US", {
+			month: "short",
+			day: "numeric",
+			year: "numeric",
+			hour: "numeric",
+			minute: "2-digit",
 			timeZone: timezone,
-			hour12: true
+			hour12: true,
 		});
 
 		// Format inspect URL - use GitHub Actions run URL only
 		const inspectUrl = getGitHubActionsRunUrl();
-		
+
+		// Generate the performance badge for the URL if it exists
+		const performanceBadge = aliasUrl ? getPerformanceBadge(aliasUrl) : "";
+
 		// Add current deployment to the list
 		deployments.push({
 			name: projectName,
 			status: `${statusIcon} ${statusText} ([Inspect](${inspectUrl}))`,
-			url: aliasUrl ? `${url_emoji} [Visit Preview](${aliasUrl})` : "",
+			url: aliasUrl ? `${url_emoji} [Visit Preview](${aliasUrl})${performanceBadge}` : "",
 			inspect_url: inspectUrl,
-			updated: updatedDate
+			updated: updatedDate,
 		});
-		
+
 		// Create summary table
 		let tableContent = `## ${headerTitle}
 
-| Name | Status | Preview | Updated (${timezone}) |
+| Name | Status | Preview | Updated (${timezone}) | 
 | ---- | ------ | ------- | ------------- |
 `;
 
@@ -367,7 +390,7 @@ try {
 			const nameCell = dep.name === projectName ? `**${dep.name}**` : dep.name;
 			tableContent += `| ${nameCell} | ${dep.status} | ${dep.url} | ${dep.updated} |\n`;
 		}
-		
+
 		// Add commit info below the table
 		tableContent += `\n**Latest commit:** \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\``;
 
@@ -403,32 +426,30 @@ try {
 
 		// Get existing deployments from comment if available
 		let existingDeployments: DeploymentInfo[] = [];
-		
+
 		if (((gitHubToken && gitHubToken.length) || (appId && privateKey && installationId)) && context.issue.number) {
 			const comments = await octokit.rest.issues.listComments({
 				owner: context.repo.owner,
 				repo: context.repo.repo,
 				issue_number: context.issue.number,
 			});
-			
-			const deploymentComment = comments.data.find(
-				(c) => c.body?.includes(headerTitle)
-			);
-			
+
+			const deploymentComment = comments.data.find((c) => c.body?.includes(headerTitle));
+
 			if (deploymentComment && deploymentComment.body) {
 				existingDeployments = extractDeploymentsFromComment(deploymentComment.body, projectName);
 			}
 		}
 
-		const summaryContent = await createJobSummary({ 
-			deployment: pagesDeployment, 
-			aliasUrl: alias, 
+		const summaryContent = await createJobSummary({
+			deployment: pagesDeployment,
+			aliasUrl: alias,
 			productionEnvironment,
-			deployments: existingDeployments
+			deployments: existingDeployments,
 		});
-		
+
 		const commentResult = await createDeploymentComment(octokit, summaryContent);
-		
+
 		// Add reactions to the comment if specified
 		if (commentResult && reactions.length > 0) {
 			const commentId = commentResult.data.id;

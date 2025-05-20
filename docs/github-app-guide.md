@@ -18,6 +18,7 @@ This guide walks you through creating a GitHub App for use with the Cloudflare P
 Under "Permissions", set the following:
 
 1. **Repository permissions**:
+
    - **Issues**: Read & Write
    - **Pull requests**: Read & Write
    - **Contents**: Read-only (if you want to comment on specific code/files)
@@ -31,6 +32,7 @@ Under "Permissions", set the following:
 ## Step 3: Upload a Custom Logo
 
 1. Prepare an image file meeting these requirements:
+
    - Square dimensions (1:1 aspect ratio)
    - At least 200x200 pixels
    - File size under 1MB
@@ -61,7 +63,7 @@ Under "Permissions", set the following:
 You need three pieces of information:
 
 1. **App ID**: Found at the top of your app's settings page
-2. **Installation ID**: Found in the URL when you visit the installation page 
+2. **Installation ID**: Found in the URL when you visit the installation page
    - The URL will look like: `https://github.com/settings/installations/INSTALLATION_ID`
 3. **Private Key**: The contents of the `.pem` file downloaded earlier
 
@@ -96,4 +98,4 @@ You need three pieces of information:
 - **Authentication errors**: Verify the private key is correctly set as a secret, including any newline characters.
 - **Permission errors**: Ensure your app has both Issues and Pull requests write permissions.
 
-That's it! Your deployment comments should now show your custom avatar. 
+That's it! Your deployment comments should now show your custom avatar.

@@ -34351,20 +34351,36 @@ var getGitHubActionsRunUrl = () => {
   return url;
 };
 var headerTitle = "\u{1F680} Deploying your latest changes";
+var extractDomainFromUrl = (url) => {
+  try {
+    const match = url.match(/^(?:https?:\/\/)?([^\/]+)/i);
+    return match ? match[1] : null;
+  } catch (error) {
+    console.warn(`Failed to extract domain from URL: ${url}`);
+    return null;
+  }
+};
+var getPerformanceBadge = (url) => {
+  const domain = extractDomainFromUrl(url);
+  if (!domain)
+    return "";
+  return `
+[![Performance](https://page-speed.dev/badge/${domain})](https://page-speed.dev/${domain})`;
+};
 var extractDeploymentsFromComment = (commentBody, currentProjectName) => {
   const deployments = [];
-  const tableRows = commentBody.match(/\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|/g);
-  if (tableRows && tableRows.length > 2) {
-    for (let i = 2; i < tableRows.length; i++) {
-      const row = tableRows[i];
-      const cells = row.split("|").map((cell) => cell.trim()).filter(Boolean);
-      if (cells.length >= 4) {
-        const name = cells[0];
-        const status = cells[1];
-        const url = cells[2];
-        const inspectUrlMatch = cells[1].match(/\[Inspect\]\(([^)]+)\)/);
+  const tableRegex = /\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|\s*([\s\S]*?)\s*\|\s*([^|]*?)\s*\|/g;
+  const matches = [...commentBody.matchAll(tableRegex)];
+  if (matches.length > 2) {
+    for (let i = 2; i < matches.length; i++) {
+      const match = matches[i];
+      if (match.length >= 5) {
+        const name = match[1].trim();
+        const status = match[2].trim();
+        const url = match[3].trim();
+        const updated = match[4].trim();
+        const inspectUrlMatch = status.match(/\[Inspect\]\(([^)]+)\)/);
         const inspect_url = inspectUrlMatch ? inspectUrlMatch[1] : "";
-        const updated = cells[3];
         if (name !== currentProjectName) {
           deployments.push({ name, status, url, inspect_url, updated });
         }
@@ -34448,9 +34464,7 @@ try {
     });
     if (debug)
       console.dir("comments.data", comments.data);
-    const deploymentComment = comments.data.find(
-      (c) => c.body?.includes(headerTitle)
-    );
+    const deploymentComment = comments.data.find((c) => c.body?.includes(headerTitle));
     let commentId;
     if (deploymentComment) {
       const result = await octokit.rest.issues.updateComment({
@@ -34479,19 +34493,19 @@ try {
     const reactionMap = {
       "+1": "+1",
       "-1": "-1",
-      "laugh": "laugh",
-      "confused": "confused",
-      "heart": "heart",
-      "hooray": "hooray",
-      "rocket": "rocket",
-      "eyes": "eyes"
+      laugh: "laugh",
+      confused: "confused",
+      heart: "heart",
+      hooray: "hooray",
+      rocket: "rocket",
+      eyes: "eyes"
     };
     const customMap = {
-      "tada": "hooray",
-      "fire": "hooray",
-      "sparkles": "hooray",
-      "party_popper": "hooray",
-      "party_blob": "hooray"
+      tada: "hooray",
+      fire: "hooray",
+      sparkles: "hooray",
+      party_popper: "hooray",
+      party_blob: "hooray"
     };
     for (const reaction of reactions2) {
       try {
@@ -34583,16 +34597,17 @@ try {
       hour12: true
     });
     const inspectUrl = getGitHubActionsRunUrl();
+    const performanceBadge = aliasUrl ? getPerformanceBadge(aliasUrl) : "";
     deployments.push({
       name: projectName,
       status: `${statusIcon} ${statusText} ([Inspect](${inspectUrl}))`,
-      url: aliasUrl ? `${url_emoji} [Visit Preview](${aliasUrl})` : "",
+      url: aliasUrl ? `${url_emoji} [Visit Preview](${aliasUrl})${performanceBadge}` : "",
       inspect_url: inspectUrl,
       updated: updatedDate
     });
     let tableContent = `## ${headerTitle}
 
-| Name | Status | Preview | Updated (${timezone}) |
+| Name | Status | Preview | Updated (${timezone}) | 
 | ---- | ------ | ------- | ------------- |
 `;
     for (const dep of deployments) {
@@ -34632,9 +34647,7 @@ try {
         repo: import_github.context.repo.repo,
         issue_number: import_github.context.issue.number
       });
-      const deploymentComment = comments.data.find(
-        (c) => c.body?.includes(headerTitle)
-      );
+      const deploymentComment = comments.data.find((c) => c.body?.includes(headerTitle));
       if (deploymentComment && deploymentComment.body) {
         existingDeployments = extractDeploymentsFromComment(deploymentComment.body, projectName);
       }

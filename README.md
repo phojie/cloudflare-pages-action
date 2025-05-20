@@ -50,7 +50,7 @@ GitHub Action for creating Cloudflare Pages deployments, using the new [Direct U
              # Optional: Change the working directory
              workingDirectory: my-site
              # Optional: Change the Wrangler version, allows you to point to a specific version or a tag such as `beta`
-             wranglerVersion: '3'
+             wranglerVersion: "3"
    ```
 
 1. Replace `YOUR_ACCOUNT_ID`, `YOUR_PROJECT_NAME` and `YOUR_BUILD_OUTPUT_DIRECTORY` with the appropriate values to your Pages project.
@@ -133,7 +133,7 @@ jobs:
           projectName: my-docs-site
           directory: docs/dist
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          
+
   deploy-marketing:
     runs-on: ubuntu-latest
     name: Deploy Marketing Site
@@ -180,6 +180,7 @@ This will deploy all three projects and maintain a single deployment summary in 
 By default, comments created by this action will show the GitHub Actions bot avatar. If you want to use a custom avatar (like the triangular logo shown in the screenshots), you can create a GitHub App:
 
 1. **Create a GitHub App**
+
    - Go to your GitHub account settings > Developer settings > GitHub Apps
    - Click "New GitHub App"
    - Fill in the required fields:
@@ -193,10 +194,12 @@ By default, comments created by this action will show the GitHub Actions bot ava
    - Create the app
 
 2. **Install the App to your repositories**
+
    - After creating, click "Install App"
    - Select which repositories to enable it for
 
 3. **Generate a private key**
+
    - In your app settings, scroll down to "Private keys"
    - Click "Generate a private key"
    - Download the key file
@@ -238,6 +241,7 @@ You can automatically add reactions to deployment comments by specifying them in
 ```
 
 Supported reactions:
+
 - `+1` (👍)
 - `-1` (👎)
 - `laugh` (😄)
@@ -268,23 +272,23 @@ jobs:
     name: Deploy
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: 18
-          
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 8
-          
+
       - name: Install dependencies
         run: pnpm install
-        
+
       - name: Build
         run: pnpm run build
-        
+
       - name: Deploy to Cloudflare Pages
         uses: phojie/cloudflare-pages-action@main
         with:
@@ -311,4 +315,3 @@ For more detailed information and advanced usage, check out these guides:
 
 - [Setting up a GitHub App for Custom Avatars](docs/github-app-guide.md)
 - [Adding Reactions to Deployment Comments](docs/reactions-guide.md)
-

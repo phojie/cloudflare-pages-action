@@ -32,7 +32,7 @@ Add the `reactions` input to your workflow configuration:
 GitHub supports these standard reactions:
 
 | Reaction Name | Emoji |
-|---------------|-------|
+| ------------- | ----- |
 | `+1`          | 👍    |
 | `-1`          | 👎    |
 | `laugh`       | 😄    |
@@ -47,7 +47,7 @@ GitHub supports these standard reactions:
 The action also supports common alternative names that will be mapped to GitHub's standard reactions:
 
 | Alternative Name | Maps to  | GitHub Emoji |
-|------------------|----------|--------------|
+| ---------------- | -------- | ------------ |
 | `tada`           | `hooray` | 🎉           |
 | `fire`           | `hooray` | 🎉           |
 | `sparkles`       | `hooray` | 🎉           |
@@ -118,4 +118,4 @@ For the best experience, combine reactions with a custom GitHub App avatar:
       heart
 ```
 
-This will post comments with your custom avatar and add the specified reactions to them. 
+This will post comments with your custom avatar and add the specified reactions to them.
