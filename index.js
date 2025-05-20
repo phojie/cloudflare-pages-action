@@ -34617,7 +34617,7 @@ try {
 `;
     }
     tableContent += `
-**Latest commit:** \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\``;
+**Latest commit:** \`${import_github.context.sha.substring(0, 8)}\``;
     if (performanceBadge2) {
       for (const dep of deployments) {
         const urlMatch = dep.url.match(/\[Visit Preview\]\(([^)]+)\)/);

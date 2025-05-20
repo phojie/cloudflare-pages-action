@@ -397,7 +397,7 @@ try {
 		}
 
 		// Add commit info at the bottom
-		tableContent += `\n**Latest commit:** \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\``;
+		tableContent += `\n**Latest commit:** \`${context.sha.substring(0, 8)}\``;
 
 		// Add performance badges section if enabled
 		if (performanceBadge) {
