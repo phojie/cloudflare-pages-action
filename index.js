@@ -34615,8 +34615,9 @@ try {
       tableContent += `| ${nameCell} | ${dep.status} | ${dep.url} | ${dep.updated} |
 `;
     }
+    tableContent += `
+**Latest commit:** \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\``;
     if (performanceBadge2) {
-      tableContent += "\n\n**Performance Badges:**\n";
       for (const dep of deployments) {
         const urlMatch = dep.url.match(/\[Visit Preview\]\(([^)]+)\)/);
         if (urlMatch && urlMatch[1]) {
@@ -34624,14 +34625,11 @@ try {
           const badge = getPerformanceBadge(deploymentUrl);
           if (badge) {
             tableContent += `
-${dep.name}: ${badge}`;
+ ${badge}`;
           }
         }
       }
     }
-    tableContent += `
-
-**Latest commit:** \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\``;
     await import_core.summary.addRaw(tableContent).write();
     return tableContent;
   };

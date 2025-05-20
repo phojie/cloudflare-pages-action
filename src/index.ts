@@ -393,10 +393,11 @@ try {
 			tableContent += `| ${nameCell} | ${dep.status} | ${dep.url} | ${dep.updated} |\n`;
 		}
 
+		// Add commit info at the bottom
+		tableContent += `\n**Latest commit:** \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\``;
+
 		// Add performance badges section if enabled
 		if (performanceBadge) {
-			tableContent += "\n\n**Performance Badges:**\n";
-
 			// Add badges for all deployments with valid URLs
 			for (const dep of deployments) {
 				// Extract URL from the markdown link in the URL column if it exists
@@ -405,14 +406,11 @@ try {
 					const deploymentUrl = urlMatch[1];
 					const badge = getPerformanceBadge(deploymentUrl);
 					if (badge) {
-						tableContent += `\n${dep.name}: ${badge}`;
+						tableContent += `\n ${badge}`;
 					}
 				}
 			}
 		}
-
-		// Add commit info at the bottom
-		tableContent += `\n\n**Latest commit:** \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\``;
 
 		await summary.addRaw(tableContent).write();
 		return tableContent;
