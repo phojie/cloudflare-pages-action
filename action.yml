@@ -1,4 +1,4 @@
-name: "Cloudflare Pages GitHub Action by Zernonia"
+name: "Cloudflare Pages GitHub Action by Phojie"
 description: "Publish to Cloudflare Pages"
 branding:
   icon: "upload-cloud"
@@ -30,5 +30,5 @@ inputs:
     required: false
     default: "2"
 runs:
-  using: "node16"
+  using: "node20"
   main: "index.js"
