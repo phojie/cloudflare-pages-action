@@ -55,9 +55,10 @@ const extractDeploymentsFromComment = (
 			if (cells.length >= 4) {
 				const name = cells[0];
 				const status = cells[1];
-				// Extract URL from markdown link in Preview column
-				const urlMatch = cells[2].match(/\[([^\]]+)\]\(([^)]+)\)/);
-				const url = urlMatch ? urlMatch[2] : cells[2];
+				
+				// Instead of extracting just the URL, preserve the entire preview cell content
+				const url = cells[2];
+				
 				// Extract inspect URL from markdown link in Status column
 				const inspectUrlMatch = cells[1].match(/\[Inspect\]\(([^)]+)\)/);
 				const inspect_url = inspectUrlMatch ? inspectUrlMatch[1] : '';
@@ -84,6 +85,7 @@ try {
 	const workingDirectory = getInput("workingDirectory", { required: false });
 	const wranglerVersion = getInput("wranglerVersion", { required: false });
 	const debug = getInput("debug", { required: false });
+	const timezone = getInput("timezone", { required: false }) || "UTC";
 	
 	// GitHub App authentication inputs
 	const appId = getInput("appId", { required: false });
@@ -329,14 +331,14 @@ try {
 			url_emoji = "💥";
 		}
 		
-		// Format date for "Updated" column
+		// Format date for "Updated" column with configurable timezone
 		const updatedDate = new Date().toLocaleString('en-US', {
 			month: 'short',
 			day: 'numeric',
 			year: 'numeric',
 			hour: 'numeric',
 			minute: '2-digit',
-			timeZone: 'UTC',
+			timeZone: timezone,
 			hour12: true
 		});
 
@@ -355,7 +357,7 @@ try {
 		// Create summary table
 		let tableContent = `## ${headerTitle}
 
-| Name | Status | Preview | Updated (UTC) |
+| Name | Status | Preview | Updated (${timezone}) |
 | ---- | ------ | ------- | ------------- |
 `;
 

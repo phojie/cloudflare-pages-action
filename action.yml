@@ -33,6 +33,10 @@ inputs:
     description: "Enable debug mode for additional logging"
     required: false
     default: "false"
+  timezone:
+    description: "Timezone for timestamps in deployment comments (e.g., 'UTC', 'America/New_York', 'Asia/Tokyo')"
+    required: false
+    default: "UTC"
   appId:
     description: "GitHub App ID (to use a GitHub App instead of a token for custom avatars in comments)"
     required: false

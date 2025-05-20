@@ -34361,8 +34361,7 @@ var extractDeploymentsFromComment = (commentBody, currentProjectName) => {
       if (cells.length >= 4) {
         const name = cells[0];
         const status = cells[1];
-        const urlMatch = cells[2].match(/\[([^\]]+)\]\(([^)]+)\)/);
-        const url = urlMatch ? urlMatch[2] : cells[2];
+        const url = cells[2];
         const inspectUrlMatch = cells[1].match(/\[Inspect\]\(([^)]+)\)/);
         const inspect_url = inspectUrlMatch ? inspectUrlMatch[1] : "";
         const updated = cells[3];
@@ -34384,6 +34383,7 @@ try {
   const workingDirectory = (0, import_core.getInput)("workingDirectory", { required: false });
   const wranglerVersion = (0, import_core.getInput)("wranglerVersion", { required: false });
   const debug = (0, import_core.getInput)("debug", { required: false });
+  const timezone = (0, import_core.getInput)("timezone", { required: false }) || "UTC";
   const appId = (0, import_core.getInput)("appId", { required: false });
   const privateKey = (0, import_core.getInput)("privateKey", { required: false });
   const installationId = (0, import_core.getInput)("installationId", { required: false });
@@ -34579,7 +34579,7 @@ try {
       year: "numeric",
       hour: "numeric",
       minute: "2-digit",
-      timeZone: "UTC",
+      timeZone: timezone,
       hour12: true
     });
     const inspectUrl = getGitHubActionsRunUrl();
@@ -34592,7 +34592,7 @@ try {
     });
     let tableContent = `## ${headerTitle}
 
-| Name | Status | Preview | Updated (UTC) |
+| Name | Status | Preview | Updated (${timezone}) |
 | ---- | ------ | ------- | ------------- |
 `;
     for (const dep of deployments) {
