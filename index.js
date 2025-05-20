@@ -34400,6 +34400,7 @@ try {
   const debug = (0, import_core.getInput)("debug", { required: false });
   const timezone = (0, import_core.getInput)("timezone", { required: false }) || "UTC";
   const performanceBadge = (0, import_core.getInput)("performanceBadge", { required: false }) === "true";
+  const createGitHubDeploymentOption = (0, import_core.getInput)("createGitHubDeployment", { required: false }) !== "false";
   const appId = (0, import_core.getInput)("appId", { required: false });
   const privateKey = (0, import_core.getInput)("privateKey", { required: false });
   const installationId = (0, import_core.getInput)("installationId", { required: false });
@@ -34639,8 +34640,12 @@ try {
     const productionEnvironment = githubBranch === project.production_branch || branch === project.production_branch;
     const environmentName = `${projectName} (${productionEnvironment ? "Production" : "Preview"})`;
     let gitHubDeployment;
-    if (gitHubToken && gitHubToken.length || appId && privateKey && installationId) {
-      gitHubDeployment = await createGitHubDeployment(octokit, productionEnvironment, environmentName);
+    if (createGitHubDeploymentOption && (gitHubToken && gitHubToken.length || appId && privateKey && installationId)) {
+      try {
+        gitHubDeployment = await createGitHubDeployment(octokit, productionEnvironment, environmentName);
+      } catch (error) {
+        console.warn("Failed to create GitHub deployment, continuing without it:", error.message);
+      }
     }
     const pagesDeployment = await createPagesDeployment();
     if (debug)

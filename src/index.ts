@@ -105,6 +105,9 @@ try {
 	const timezone = getInput("timezone", { required: false }) || "UTC";
 	const performanceBadge = getInput("performanceBadge", { required: false }) === "true";
 
+	// Add option to disable GitHub deployments
+	const createGitHubDeploymentOption = getInput("createGitHubDeployment", { required: false }) !== "false";
+
 	// GitHub App authentication inputs
 	const appId = getInput("appId", { required: false });
 	const privateKey = getInput("privateKey", { required: false });
@@ -426,8 +429,13 @@ try {
 
 		let gitHubDeployment: Awaited<ReturnType<typeof createGitHubDeployment>>;
 
-		if ((gitHubToken && gitHubToken.length) || (appId && privateKey && installationId)) {
-			gitHubDeployment = await createGitHubDeployment(octokit, productionEnvironment, environmentName);
+		// Only create GitHub deployment if option is enabled
+		if (createGitHubDeploymentOption && ((gitHubToken && gitHubToken.length) || (appId && privateKey && installationId))) {
+			try {
+				gitHubDeployment = await createGitHubDeployment(octokit, productionEnvironment, environmentName);
+			} catch (error) {
+				console.warn("Failed to create GitHub deployment, continuing without it:", error.message);
+			}
 		}
 
 		const pagesDeployment = await createPagesDeployment();

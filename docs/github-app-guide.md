@@ -22,6 +22,7 @@ Under "Permissions", set the following:
    - **Issues**: Read & Write
    - **Pull requests**: Read & Write
    - **Contents**: Read-only (if you want to comment on specific code/files)
+   - **Deployments**: Read & Write (required if you want GitHub deployment status integration)
 
 2. **Account permissions**: None needed
 
