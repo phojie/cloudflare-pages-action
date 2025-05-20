@@ -34380,7 +34380,7 @@ var extractDeploymentsFromComment = (commentBody, currentProjectName) => {
         const updated = match[4].trim();
         const inspectUrlMatch = status.match(/\[Inspect\]\(([^)]+)\)/);
         const inspect_url = inspectUrlMatch ? inspectUrlMatch[1] : "";
-        if (name !== currentProjectName) {
+        if (name.replace(/\*\*/g, "") !== currentProjectName) {
           deployments.push({ name, status, url, inspect_url, updated });
         }
       }

@@ -81,8 +81,8 @@ const extractDeploymentsFromComment = (commentBody: string, currentProjectName: 
 				const inspectUrlMatch = status.match(/\[Inspect\]\(([^)]+)\)/);
 				const inspect_url = inspectUrlMatch ? inspectUrlMatch[1] : "";
 
-				// Only add if it's not the current project being updated
-				if (name !== currentProjectName) {
+				// Filter out ANY deployment with the same name as the current project
+				if (name.replace(/\*\*/g, "") !== currentProjectName) {
 					deployments.push({ name, status, url, inspect_url, updated });
 				}
 			}
