@@ -34362,9 +34362,9 @@ var extractDeploymentsFromComment = (commentBody, currentProjectName) => {
         const name = cells[0];
         const status = cells[1];
         const urlMatch = cells[2].match(/\[([^\]]+)\]\(([^)]+)\)/);
-        const url = urlMatch ? urlMatch[2] : "";
-        const inspectUrlMatch = cells[1].match(/\[([^\]]+)\]\(([^)]+)\)/);
-        const inspect_url = inspectUrlMatch ? inspectUrlMatch[2] : "";
+        const url = urlMatch ? urlMatch[2] : cells[2];
+        const inspectUrlMatch = cells[1].match(/\[Inspect\]\(([^)]+)\)/);
+        const inspect_url = inspectUrlMatch ? inspectUrlMatch[1] : "";
         const updated = cells[3];
         if (name !== currentProjectName) {
           deployments.push({ name, status, url, inspect_url, updated });
@@ -34449,7 +34449,7 @@ try {
     if (debug)
       console.dir("comments.data", comments.data);
     const deploymentComment = comments.data.find(
-      (c) => !!c.performed_via_github_app?.id && c.body?.includes(headerTitle)
+      (c) => c.body?.includes(headerTitle)
     );
     let commentId;
     if (deploymentComment) {
@@ -34561,13 +34561,13 @@ try {
     deployments = []
   }) => {
     const deployStage = deployment.stages.find((stage) => stage.name === "deploy");
-    let statusIcon = "\u26A1\uFE0F";
-    let statusText = "Deploying";
-    let url_emoji = "\u26A1\uFE0F";
-    if (deployStage?.status === "success") {
-      statusIcon = "\u2705";
-      statusText = "Ready";
-      url_emoji = "\u{1F60E}";
+    let statusIcon = "\u2705";
+    let statusText = "Ready";
+    let url_emoji = "\u{1F60E}";
+    if (deployStage?.status === "idle") {
+      statusIcon = "\u26A1\uFE0F";
+      statusText = "Deploying";
+      url_emoji = "\u26A1\uFE0F";
     } else if (deployStage?.status === "failure") {
       statusIcon = "\u{1F6AB}";
       statusText = "Failed";
@@ -34586,7 +34586,7 @@ try {
     deployments.push({
       name: projectName,
       status: `${statusIcon} ${statusText} ([Inspect](${inspectUrl}))`,
-      url: `${url_emoji} [Visit Preview](${aliasUrl})`,
+      url: aliasUrl ? `${url_emoji} [Visit Preview](${aliasUrl})` : "",
       inspect_url: inspectUrl,
       updated: updatedDate
     });

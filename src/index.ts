@@ -57,10 +57,10 @@ const extractDeploymentsFromComment = (
 				const status = cells[1];
 				// Extract URL from markdown link in Preview column
 				const urlMatch = cells[2].match(/\[([^\]]+)\]\(([^)]+)\)/);
-				const url = urlMatch ? urlMatch[2] : '';
+				const url = urlMatch ? urlMatch[2] : cells[2];
 				// Extract inspect URL from markdown link in Status column
-				const inspectUrlMatch = cells[1].match(/\[([^\]]+)\]\(([^)]+)\)/);
-				const inspect_url = inspectUrlMatch ? inspectUrlMatch[2] : '';
+				const inspectUrlMatch = cells[1].match(/\[Inspect\]\(([^)]+)\)/);
+				const inspect_url = inspectUrlMatch ? inspectUrlMatch[1] : '';
 				const updated = cells[3];
 				
 				// Only add if it's not the current project being updated
@@ -171,7 +171,7 @@ try {
 		});
 		if (debug) console.dir("comments.data", comments.data);
 		const deploymentComment = comments.data.find(
-			(c) => !!c.performed_via_github_app?.id && c.body?.includes(headerTitle)
+			(c) => c.body?.includes(headerTitle)
 		);
 		
 		let commentId: number;
@@ -316,13 +316,13 @@ try {
 		const deployStage = deployment.stages.find((stage) => stage.name === "deploy");
 
 		// Format current deployment status
-		let statusIcon = "⚡️";
-		let statusText = "Deploying";
-		let url_emoji = "⚡️";
-		if (deployStage?.status === "success") {
-			statusIcon = "✅";
-			statusText = "Ready";
-			url_emoji = "😎";
+		let statusIcon = "✅";
+		let statusText = "Ready";
+		let url_emoji = "😎";
+		if (deployStage?.status === "idle") {
+			statusIcon = "⚡️";
+			statusText = "Deploying";
+			url_emoji = "⚡️";
 		} else if (deployStage?.status === "failure") {
 			statusIcon = "🚫";
 			statusText = "Failed";
@@ -347,7 +347,7 @@ try {
 		deployments.push({
 			name: projectName,
 			status: `${statusIcon} ${statusText} ([Inspect](${inspectUrl}))`,
-			url: `${url_emoji} [Visit Preview](${aliasUrl})`,
+			url: aliasUrl ? `${url_emoji} [Visit Preview](${aliasUrl})` : "",
 			inspect_url: inspectUrl,
 			updated: updatedDate
 		});
