@@ -56,7 +56,7 @@ const getPerformanceBadge = (url: string): string => {
 	const domain = extractDomainFromUrl(url);
 	if (!domain) return "";
 
-	return `\n[![Performance](https://page-speed.dev/badge/${domain})](https://page-speed.dev/${domain})`;
+	return `[![Performance](https://page-speed.dev/badge/${domain})](https://page-speed.dev/${domain})`;
 };
 
 // Helper function to extract deployments from comment body
@@ -103,6 +103,7 @@ try {
 	const wranglerVersion = getInput("wranglerVersion", { required: false });
 	const debug = getInput("debug", { required: false });
 	const timezone = getInput("timezone", { required: false }) || "UTC";
+	const performanceBadge = getInput("performanceBadge", { required: false }) === "true";
 
 	// GitHub App authentication inputs
 	const appId = getInput("appId", { required: false });
@@ -329,11 +330,13 @@ try {
 		aliasUrl,
 		productionEnvironment,
 		deployments = [],
+		performanceBadge = false,
 	}: {
 		deployment: Deployment;
 		aliasUrl: string;
 		productionEnvironment: boolean;
 		deployments?: DeploymentInfo[];
+		performanceBadge?: boolean;
 	}) => {
 		const deployStage = deployment.stages.find((stage) => stage.name === "deploy");
 
@@ -366,13 +369,12 @@ try {
 		const inspectUrl = getGitHubActionsRunUrl();
 
 		// Generate the performance badge for the URL if it exists
-		const performanceBadge = aliasUrl ? getPerformanceBadge(aliasUrl) : "";
 
 		// Add current deployment to the list
 		deployments.push({
 			name: projectName,
 			status: `${statusIcon} ${statusText} ([Inspect](${inspectUrl}))`,
-			url: aliasUrl ? `${url_emoji} [Visit Preview](${aliasUrl})${performanceBadge}` : "",
+			url: aliasUrl ? `${url_emoji} [Visit Preview](${aliasUrl})` : "",
 			inspect_url: inspectUrl,
 			updated: updatedDate,
 		});
@@ -391,8 +393,26 @@ try {
 			tableContent += `| ${nameCell} | ${dep.status} | ${dep.url} | ${dep.updated} |\n`;
 		}
 
-		// Add commit info below the table
-		tableContent += `\n**Latest commit:** \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\``;
+		// Add performance badges section if enabled
+		if (performanceBadge) {
+			tableContent += "\n\n**Performance Badges:**\n";
+
+			// Add badges for all deployments with valid URLs
+			for (const dep of deployments) {
+				// Extract URL from the markdown link in the URL column if it exists
+				const urlMatch = dep.url.match(/\[Visit Preview\]\(([^)]+)\)/);
+				if (urlMatch && urlMatch[1]) {
+					const deploymentUrl = urlMatch[1];
+					const badge = getPerformanceBadge(deploymentUrl);
+					if (badge) {
+						tableContent += `\n${dep.name}: ${badge}`;
+					}
+				}
+			}
+		}
+
+		// Add commit info at the bottom
+		tableContent += `\n\n**Latest commit:** \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\``;
 
 		await summary.addRaw(tableContent).write();
 		return tableContent;
@@ -446,6 +466,7 @@ try {
 			aliasUrl: alias,
 			productionEnvironment,
 			deployments: existingDeployments,
+			performanceBadge,
 		});
 
 		const commentResult = await createDeploymentComment(octokit, summaryContent);

@@ -49,6 +49,10 @@ inputs:
   reactions:
     description: "List of reactions to add to comments (separated by newlines)"
     required: false
+  performanceBadge:
+    description: "Display performance badges"
+    required: false
+    default: "false"
 runs:
   using: "node16"
   main: "index.js"

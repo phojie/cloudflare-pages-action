@@ -34364,8 +34364,7 @@ var getPerformanceBadge = (url) => {
   const domain = extractDomainFromUrl(url);
   if (!domain)
     return "";
-  return `
-[![Performance](https://page-speed.dev/badge/${domain})](https://page-speed.dev/${domain})`;
+  return `[![Performance](https://page-speed.dev/badge/${domain})](https://page-speed.dev/${domain})`;
 };
 var extractDeploymentsFromComment = (commentBody, currentProjectName) => {
   const deployments = [];
@@ -34400,6 +34399,7 @@ try {
   const wranglerVersion = (0, import_core.getInput)("wranglerVersion", { required: false });
   const debug = (0, import_core.getInput)("debug", { required: false });
   const timezone = (0, import_core.getInput)("timezone", { required: false }) || "UTC";
+  const performanceBadge = (0, import_core.getInput)("performanceBadge", { required: false }) === "true";
   const appId = (0, import_core.getInput)("appId", { required: false });
   const privateKey = (0, import_core.getInput)("privateKey", { required: false });
   const installationId = (0, import_core.getInput)("installationId", { required: false });
@@ -34572,7 +34572,8 @@ try {
     deployment,
     aliasUrl,
     productionEnvironment,
-    deployments = []
+    deployments = [],
+    performanceBadge: performanceBadge2 = false
   }) => {
     const deployStage = deployment.stages.find((stage) => stage.name === "deploy");
     let statusIcon = "\u2705";
@@ -34597,11 +34598,10 @@ try {
       hour12: true
     });
     const inspectUrl = getGitHubActionsRunUrl();
-    const performanceBadge = aliasUrl ? getPerformanceBadge(aliasUrl) : "";
     deployments.push({
       name: projectName,
       status: `${statusIcon} ${statusText} ([Inspect](${inspectUrl}))`,
-      url: aliasUrl ? `${url_emoji} [Visit Preview](${aliasUrl})${performanceBadge}` : "",
+      url: aliasUrl ? `${url_emoji} [Visit Preview](${aliasUrl})` : "",
       inspect_url: inspectUrl,
       updated: updatedDate
     });
@@ -34615,7 +34615,22 @@ try {
       tableContent += `| ${nameCell} | ${dep.status} | ${dep.url} | ${dep.updated} |
 `;
     }
+    if (performanceBadge2) {
+      tableContent += "\n\n**Performance Badges:**\n";
+      for (const dep of deployments) {
+        const urlMatch = dep.url.match(/\[Visit Preview\]\(([^)]+)\)/);
+        if (urlMatch && urlMatch[1]) {
+          const deploymentUrl = urlMatch[1];
+          const badge = getPerformanceBadge(deploymentUrl);
+          if (badge) {
+            tableContent += `
+${dep.name}: ${badge}`;
+          }
+        }
+      }
+    }
     tableContent += `
+
 **Latest commit:** \`${deployment.deployment_trigger.metadata.commit_hash.substring(0, 8)}\``;
     await import_core.summary.addRaw(tableContent).write();
     return tableContent;
@@ -34656,7 +34671,8 @@ try {
       deployment: pagesDeployment,
       aliasUrl: alias,
       productionEnvironment,
-      deployments: existingDeployments
+      deployments: existingDeployments,
+      performanceBadge
     });
     const commentResult = await createDeploymentComment(octokit, summaryContent);
     if (commentResult && reactions.length > 0) {
